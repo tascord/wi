@@ -1,0 +1,39 @@
+// @ts-nocheck
+
+/* Explicit type declaration */
+let x = 4 as i8;
+let y = 'abc' as string;
+let z = 126 as i16;
+
+/* Implicit type declaration */
+let a = 4;
+let b = 'abc';
+let c = 126;
+
+/* Object type declaration */
+let object = {
+    "username": "flora" as string,
+    "password": "123456" as string,
+    "age": 18 as i8,
+};
+
+/* Function declaration */
+fn explicit(a as i32) as void {
+    print("%1", a);
+}
+
+fn implicit(a as i32) {
+    print("%1", a);
+}
+
+/* Function call */
+explicit(4);
+
+implicit(4);
+
+/* Global function calling */
+print("Hello, world!");
+
+/* Basic web request */
+let url = 'https://www.google.com/';
+let data = await web.fetch() as { text: string };

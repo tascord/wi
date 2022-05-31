@@ -1,4 +1,0 @@
-let x = 1 + 1;
-
-//@ts-ignore
-print(x)

@@ -1,0 +1,14 @@
+// @ts-nocheck
+
+/* Explicit type declaration */
+let x = 4 as i8;
+let y = 'abc' as string;
+let z = 126 as i16;
+
+/* Implicit type declaration */
+let a = 4;
+let b = 'abc';
+let c = 126;
+
+print(x, y, z);
+print(a, b, c);
