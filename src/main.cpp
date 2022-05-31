@@ -308,12 +308,13 @@ static std::map<char, int> BinaryPriority = {
     {'/', 40},
 };
 
-static int GetTokenPriority() {
-    if(!isascii(CurrentToken))
+static int GetTokenPriority()
+{
+    if (!isascii(CurrentToken))
         return -1;
-    
+
     int Priority = BinaryPriority[CurrentToken];
-    if(Priority < 0)
+    if (Priority < 0)
         return -1;
 
     return Priority;
@@ -321,8 +322,33 @@ static int GetTokenPriority() {
 
 /** ------------------------------------------- */
 
-static std::unique_ptr<Node> ParseExpression() {
+static std::unique_ptr<Node> ParseExpression()
+{
+    auto Left = ParsePrimary();
 
+    if (!Left)
+        return nullptr;
+
+    return ParseBinaryRight(0, std::move(Left));
+}
+
+static std::unique_ptr<Node> ParseBinaryRight(int Priority, std::unique_ptr<Node> Left) {
+    while(true) {
+        int NewPriority = GetTokenPriority();
+
+        if (NewPriority < Priority)
+            return Left;
+
+        int Operator = CurrentToken;
+        GetNextToken();
+
+        auto Right = ParsePrimary();
+        if (!Right)
+            return nullptr;
+
+        int NextPriority = GetTokenPriority();
+        if(NewPriority < )
+    }    
 }
 
 /** ------------------------------------------- */
