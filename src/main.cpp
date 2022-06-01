@@ -1,3 +1,15 @@
+#include "llvm/ADT/APFloat.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/Constants.h"
+#include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/Function.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/LLVMContext.h"
+#include "llvm/IR/Module.h"
+#include "llvm/IR/Type.h"
+#include "llvm/IR/Verifier.h"
+#include <algorithm>
 #include <cctype>
 #include <cstdio>
 #include <cstdlib>
@@ -32,42 +44,54 @@ enum Token
 static std::string Identifier;  // Identifier value | IdentifierStr
 static double NumericalValue;   // Numerical value | NumVal
 static std::string StringValue; // String value |
-static std::string DebugValue = "";
 
+static int LastChar = ' ';
 static int GetToken()
 {
-    static int LastChar = ' ';
-
-    /** ------------------------------------------- */
-
-    // Single line comments
-    if (LastChar == '/' && getchar() == '/')
-    {
-        cout << "[Lexer] | Skipping single line comment" << endl;
-        while (LastChar != '\n')
-        {
-            LastChar = getchar();
-        }
-        return GetToken();
-    }
-
-    // Multi-line comments
-    if (LastChar == '/' && getchar() == '*')
-    {
-        cout << "[Lexer] | Skipping multi line comment" << endl;
-        while (LastChar != '*' || getchar() != '/')
-            LastChar = getchar();
-        LastChar = getchar();
-        return GetToken();
-    }
 
     /** ------------------------------------------- */
 
     // Skip whitespace
     while (isspace(LastChar))
     {
-        cout << "[Lexer] | Skipping whitespace" << endl;
+        // cout << "[Lexer  ] | Skipping whitespace" << endl;
         LastChar = getchar();
+    }
+
+    /** ------------------------------------------- */
+    if (LastChar != '\n')
+        cout << "[Lexer  ] | Cursor @> : " << char(LastChar) << endl;
+
+    // Comments
+    if (LastChar == '/')
+    {
+
+        cout << "[Lexer  ] | Comment detected" << endl;
+        int Char = getchar();
+
+        // Single-line
+        if (Char == '/')
+        {
+            cout << "[Lexer  ] | Skipping single line comment" << endl;
+            while (LastChar != '\n')
+            {
+                LastChar = getchar();
+            }
+            return GetToken();
+        }
+
+        // Multi-line
+        if (Char == '*')
+        {
+            cout << "[Lexer  ] | Skipping multi line comment" << endl;
+            while (LastChar != '*' || getchar() != '/')
+                LastChar = getchar();
+            LastChar = getchar();
+            return GetToken();
+        }
+
+        // If neither, continue with '/'
+        LastChar = Char;
     }
 
     /** ------------------------------------------- */
@@ -75,10 +99,11 @@ static int GetToken()
     // Look for alphanumeric characters
     if (isalpha(LastChar))
     {
-        cout << "[Lexer] | Reading alphanumeric" << endl;
         Identifier = LastChar;
         while (isalnum(LastChar = getchar()))
             Identifier += LastChar;
+
+        cout << "[Lexer  ] | Alphanumeric: " << Identifier << endl;
 
         // Function definition
         if (Identifier == "fn")
@@ -95,7 +120,6 @@ static int GetToken()
     // Look for numbers
     if (isdigit(LastChar) || LastChar == '.')
     {
-        cout << "[Lexer] | Reading number" << endl;
         std::string Number;
         do
         {
@@ -104,14 +128,13 @@ static int GetToken()
         } while (isdigit(LastChar) || LastChar == '.');
 
         NumericalValue = std::stod(Number);
-        DebugValue = 
+        cout << "[Lexer  ] | Number '" << Number << "'" << endl;
         return NUMBER;
     }
 
     // Look for strings
     if (LastChar == '"')
     {
-        cout << "[Lexer] | Reading String" << endl;
         StringValue = "";
         LastChar = getchar();
         while (LastChar != '"')
@@ -120,7 +143,7 @@ static int GetToken()
             LastChar = getchar();
         }
         LastChar = getchar();
-        DebugValue = ;
+        cout << "[Lexer  ] | String '" << StringValue << "'" << endl;
         return STRING;
     }
 
@@ -129,7 +152,6 @@ static int GetToken()
     // End of file
     if (LastChar == EOF)
     {
-        cout << "[Lexer] | Reading EOF" << endl;
         return FILE_END;
     }
 
@@ -137,7 +159,7 @@ static int GetToken()
     int Char = LastChar;
     LastChar = getchar();
 
-    cout << "[Lexer] | Falling back" << endl;
+    // cout << "[Lexer  ] | Falling back '" << LastChar << "'" << endl;
     return Char;
 }
 
@@ -147,7 +169,8 @@ static int GetToken()
 class Node
 {
 public:
-    virtual ~Node() {}
+    virtual ~Node() = default;
+    virtual Value *codegen() = 0;
 };
 
 // Numerical | NumberExprAST
@@ -340,7 +363,9 @@ static std::unique_ptr<Node> ParsePrimary()
     case '(':
         return ParseParen();
     default:
-        return Error("Unknown token '" + std::to_string(CurrentToken) + "' in expression");
+        std::string y("Unknown token: ");
+        y.push_back(char(CurrentToken));
+        return Error(y);
     }
 }
 
@@ -471,7 +496,7 @@ static void HandleTopLevelExpression()
     // Evaluate a top-level expression into an anonymous function.
     if (ParseTopLevelExpression())
     {
-        cout << "[Parser] | Parsed a top level expression" << endl;
+        // cout << "[Parser ] | Parsed a top level expression" << endl;
     }
     else
     {
@@ -485,31 +510,30 @@ static void HandleTopLevelExpression()
 static void MainLoop()
 {
 
-    cout << "[Loop] | Begin" << endl;
+    cout << "[Loop   ] | Begin" << endl;
 
     while (true)
     {
-        cout << "[Loop] | CurrentToken: " << CurrentToken  << " Value: " << DebugValue << endl;
 
         switch (CurrentToken)
         {
         case EOF:
-            cout << "[Loop] | EOF Reached :D" << endl;
+            cout << "[Loop   ] | EOF Reached :D" << endl;
             return;
         case ';':
-            cout << "[Loop] | Semicolon: " << CurrentToken << endl;
+            // cout << "[Loop   ] | Semicolon: " << CurrentToken << endl;
             GetNextToken();
             break;
         case FN_DEF:
-            cout << "[Loop] | Function Definition: " << CurrentToken << endl;
+            // cout << "[Loop   ] | Function Definition: " << CurrentToken << endl;
             HandleDefinition();
             break;
         case EXPORT:
-            cout << "[Loop] | Export: " << CurrentToken << endl;
+            // cout << "[Loop   ] | Export: " << CurrentToken << endl;
             HandleExport();
             break;
         default:
-            cout << "[Loop] | TLE: " << CurrentToken << endl;
+            // cout << "[Loop   ] | TLE: " << CurrentToken << endl;
             HandleTopLevelExpression();
             break;
         }
@@ -520,6 +544,8 @@ static void MainLoop()
 
 int main()
 {
+
+    cout << "[Main   ] | Begin" << endl;
 
     GetNextToken();
 

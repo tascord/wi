@@ -1,0 +1,9 @@
+[19:15:10]	Compiling due to changes.
+[19:15:10]	Command failed: g++ /Users/float/Documents/Projects/wi/src/main.cpp -o /Users/float/Documents/Projects/wi/a.out -std=c++14
+[19:15:10]	/Users/float/Documents/Projects/wi/src/main.cpp:1:10: fatal error: 'llvm/ADT/APFloat.h' file not found
+[19:15:10]	#include "llvm/ADT/APFloat.h"
+[19:15:10]	         ^~~~~~~~~~~~~~~~~~~~
+[19:15:10]	1 error generated.
+[19:15:10]	
+[19:15:10]	
+[19:15:10]	Failed.
