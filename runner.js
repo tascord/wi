@@ -9,12 +9,12 @@ const compile = async () => {
 
     let cp = Number(i);
     await new Promise(ready => {
-        if(!p) return ready();
-        if(!p.kill()) console.log('Unable to kill last process');
+        if (!p) return ready();
+        if (!p.kill()) console.log('Unable to kill last process');
         ready();
     })
 
-    if(i !== cp) return;
+    if (i !== cp) return;
 
     console.clear();
     console.log(`Compiling due to changes.`);
@@ -25,8 +25,8 @@ const compile = async () => {
     }
 
     console.log(`Running...`);
-    p = exec(join(__dirname, 'a.out'));
-    
+    p = exec(`${join(__dirname, 'a.out')} < ${join(__dirname, 'tests', 'basic.wi')}`);
+
     p.stdout.on('data', (data) => {
         console.log(data);
     });

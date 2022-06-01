@@ -1,8 +1,12 @@
-#include <iostream>
-#include <string>
-#include <memory>
-#include <vector>
+#include <cctype>
+#include <cstdio>
+#include <cstdlib>
 #include <map>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+#include <iostream>
 
 using namespace std;
 
@@ -28,6 +32,7 @@ enum Token
 static std::string Identifier;  // Identifier value | IdentifierStr
 static double NumericalValue;   // Numerical value | NumVal
 static std::string StringValue; // String value |
+static std::string DebugValue = "";
 
 static int GetToken()
 {
@@ -38,14 +43,18 @@ static int GetToken()
     // Single line comments
     if (LastChar == '/' && getchar() == '/')
     {
+        cout << "[Lexer] | Skipping single line comment" << endl;
         while (LastChar != '\n')
+        {
             LastChar = getchar();
+        }
         return GetToken();
     }
 
     // Multi-line comments
     if (LastChar == '/' && getchar() == '*')
     {
+        cout << "[Lexer] | Skipping multi line comment" << endl;
         while (LastChar != '*' || getchar() != '/')
             LastChar = getchar();
         LastChar = getchar();
@@ -56,13 +65,17 @@ static int GetToken()
 
     // Skip whitespace
     while (isspace(LastChar))
+    {
+        cout << "[Lexer] | Skipping whitespace" << endl;
         LastChar = getchar();
+    }
 
     /** ------------------------------------------- */
 
     // Look for alphanumeric characters
     if (isalpha(LastChar))
     {
+        cout << "[Lexer] | Reading alphanumeric" << endl;
         Identifier = LastChar;
         while (isalnum(LastChar = getchar()))
             Identifier += LastChar;
@@ -82,6 +95,7 @@ static int GetToken()
     // Look for numbers
     if (isdigit(LastChar) || LastChar == '.')
     {
+        cout << "[Lexer] | Reading number" << endl;
         std::string Number;
         do
         {
@@ -90,12 +104,14 @@ static int GetToken()
         } while (isdigit(LastChar) || LastChar == '.');
 
         NumericalValue = std::stod(Number);
+        DebugValue = 
         return NUMBER;
     }
 
     // Look for strings
     if (LastChar == '"')
     {
+        cout << "[Lexer] | Reading String" << endl;
         StringValue = "";
         LastChar = getchar();
         while (LastChar != '"')
@@ -104,6 +120,7 @@ static int GetToken()
             LastChar = getchar();
         }
         LastChar = getchar();
+        DebugValue = ;
         return STRING;
     }
 
@@ -111,11 +128,16 @@ static int GetToken()
 
     // End of file
     if (LastChar == EOF)
+    {
+        cout << "[Lexer] | Reading EOF" << endl;
         return FILE_END;
+    }
 
     // Fallback to ASCII
     int Char = LastChar;
     LastChar = getchar();
+
+    cout << "[Lexer] | Falling back" << endl;
     return Char;
 }
 
@@ -222,6 +244,31 @@ std::unique_ptr<Prototype> ErrorPrototype(const std::string &Message)
 
 /** ------------------------------------------- */
 
+static std::map<char, int> BinaryPriority = {
+    {'<', 10},
+    {'>', 10},
+    {'+', 20},
+    {'-', 20},
+    {'*', 40},
+    {'/', 40},
+};
+
+static int GetTokenPriority()
+{
+    if (!isascii(CurrentToken))
+        return -1;
+
+    int Priority = BinaryPriority[CurrentToken];
+    if (Priority < 0)
+        return -1;
+
+    return Priority;
+}
+
+/** ------------------------------------------- */
+
+static std::unique_ptr<Node> ParseExpression();
+
 static std::unique_ptr<Node> ParseNumerical()
 {
     auto Result = std::make_unique<Numerical>(NumericalValue);
@@ -293,34 +340,41 @@ static std::unique_ptr<Node> ParsePrimary()
     case '(':
         return ParseParen();
     default:
-        return Error("Unknown token when expecting an expression");
+        return Error("Unknown token '" + std::to_string(CurrentToken) + "' in expression");
     }
 }
 
-/** ------------------------------------------- */
-
-static std::map<char, int> BinaryPriority = {
-    {'<', 10},
-    {'>', 10},
-    {'+', 20},
-    {'-', 20},
-    {'*', 40},
-    {'/', 40},
-};
-
-static int GetTokenPriority()
+static std::unique_ptr<Node> ParseBinaryRight(int Priority, std::unique_ptr<Node> Left)
 {
-    if (!isascii(CurrentToken))
-        return -1;
+    while (true)
+    {
+        int TokenPriority = GetTokenPriority();
 
-    int Priority = BinaryPriority[CurrentToken];
-    if (Priority < 0)
-        return -1;
+        if (TokenPriority < Priority)
+            return Left;
+        else
+        {
+            int Operation = CurrentToken;
+            GetNextToken();
 
-    return Priority;
+            auto Right = ParsePrimary();
+            if (Right)
+            {
+                int NextPrec = GetTokenPriority();
+                if (TokenPriority < NextPrec)
+                {
+                    Right = ParseBinaryRight(TokenPriority + 1, move(Right));
+                    if (!Right)
+                        return nullptr;
+                }
+
+                Left = make_unique<Binary>(Operation, move(Left), move(Right));
+            }
+            else
+                return nullptr;
+        }
+    }
 }
-
-/** ------------------------------------------- */
 
 static std::unique_ptr<Node> ParseExpression()
 {
@@ -332,29 +386,145 @@ static std::unique_ptr<Node> ParseExpression()
     return ParseBinaryRight(0, std::move(Left));
 }
 
-static std::unique_ptr<Node> ParseBinaryRight(int Priority, std::unique_ptr<Node> Left) {
-    while(true) {
-        int NewPriority = GetTokenPriority();
+static std::unique_ptr<Prototype> ParsePrototype()
+{
+    if (CurrentToken != IDENTIFIER)
+        return ErrorPrototype("Expected function name in prototype");
 
-        if (NewPriority < Priority)
-            return Left;
+    std::string Name = Identifier;
+    GetNextToken();
 
-        int Operator = CurrentToken;
+    if (CurrentToken != '(')
+        return ErrorPrototype("Expected '(' in prototype");
+
+    std::vector<std::string> ArgumentNames;
+    while (GetNextToken() == IDENTIFIER)
+        ArgumentNames.push_back(Identifier);
+
+    if (CurrentToken != ')')
+        return ErrorPrototype("Expected ')' in prototype");
+
+    GetNextToken();
+    return std::make_unique<Prototype>(Name, std::move(ArgumentNames));
+}
+
+static std::unique_ptr<Function> ParseDefinition()
+{
+    GetNextToken();
+    auto Proto = ParsePrototype();
+    if (!Proto)
+        return nullptr;
+
+    if (auto E = ParseExpression())
+        return std::make_unique<Function>(std::move(Proto), std::move(E));
+    else
+        return nullptr;
+}
+
+static std::unique_ptr<Prototype> ParseExport()
+{
+    GetNextToken();
+    return ParsePrototype();
+}
+
+static std::unique_ptr<Function> ParseTopLevelExpression()
+{
+    if (auto E = ParseExpression())
+    {
+        auto Proto = std::make_unique<Prototype>("", std::vector<std::string>());
+        return std::make_unique<Function>(std::move(Proto), std::move(E));
+    }
+    else
+        return nullptr;
+}
+
+/** ------------------------------------------- */
+
+static void HandleDefinition()
+{
+    if (ParseDefinition())
+    {
+        fprintf(stderr, "Parsed a function definition.\n");
+    }
+    else
+    {
+        // Skip token for error recovery.
         GetNextToken();
+    }
+}
 
-        auto Right = ParsePrimary();
-        if (!Right)
-            return nullptr;
+static void HandleExport()
+{
+    if (ParseExport())
+    {
+        fprintf(stderr, "Parsed an extern\n");
+    }
+    else
+    {
+        // Skip token for error recovery.
+        GetNextToken();
+    }
+}
 
-        int NextPriority = GetTokenPriority();
-        if(NewPriority < )
-    }    
+static void HandleTopLevelExpression()
+{
+    // Evaluate a top-level expression into an anonymous function.
+    if (ParseTopLevelExpression())
+    {
+        cout << "[Parser] | Parsed a top level expression" << endl;
+    }
+    else
+    {
+        // Skip token for error recovery.
+        GetNextToken();
+    }
+}
+
+/** ------------------------------------------- */
+
+static void MainLoop()
+{
+
+    cout << "[Loop] | Begin" << endl;
+
+    while (true)
+    {
+        cout << "[Loop] | CurrentToken: " << CurrentToken  << " Value: " << DebugValue << endl;
+
+        switch (CurrentToken)
+        {
+        case EOF:
+            cout << "[Loop] | EOF Reached :D" << endl;
+            return;
+        case ';':
+            cout << "[Loop] | Semicolon: " << CurrentToken << endl;
+            GetNextToken();
+            break;
+        case FN_DEF:
+            cout << "[Loop] | Function Definition: " << CurrentToken << endl;
+            HandleDefinition();
+            break;
+        case EXPORT:
+            cout << "[Loop] | Export: " << CurrentToken << endl;
+            HandleExport();
+            break;
+        default:
+            cout << "[Loop] | TLE: " << CurrentToken << endl;
+            HandleTopLevelExpression();
+            break;
+        }
+    }
 }
 
 /** ------------------------------------------- */
 
 int main()
 {
-    cout << "Hello, World!" << endl;
+
+    GetNextToken();
+
+    cout << "[Primed & Ready] | Beginning MainLoop" << endl;
+    MainLoop();
+
     return 0;
 }
